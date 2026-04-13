@@ -1,13 +1,29 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <errno.h>
 #include <stdlib.h>
+
+struct zip_header {
+  uint16_t version_needed_to_extract;
+  uint16_t general_purpose_bit_flag;
+  uint16_t compression_method;
+  uint16_t last_mod_file_time;
+  uint16_t last_mod_file_date;
+  uint32_t crc_32;
+  uint32_t compressed_size;
+  uint32_t uncompressed_size;
+  uint16_t file_name_length;
+  uint16_t extra_field_length;
+  size_t file_name;
+  size_t extra_field;
+};
 
 int main(void) {
 	char *source = NULL;
 	FILE *fp;
 	unsigned char c;
 
-	fp = fopen("example.zip", "rb");
+	fp = fopen("APPNOTE.txt", "rb");
 
 	// If the file doesn't exist
 	if (fp == NULL) {
@@ -43,11 +59,13 @@ int main(void) {
 	}
 
 
-  // Verify that the first few bytes match the file number
-
-  for (int i = 0; i < 20; i++) {
-    printf("%x ", source[i]);
+  // Verify the file header
+  if (source[0] != 0x50 || source[1] != 0x4b) {
+    fputs("Error reading file", stderr);
   }
+  
+
+  // TODO: Read the header into the struct.
 
 	fclose(fp);
   free(source);
