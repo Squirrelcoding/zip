@@ -135,7 +135,7 @@ Copyright (c) 1989 - 2014, 2018, 2019, 2020, 2022 PKWARE Inc., All Rights Reserv
                  -Added OS X to Version Made By values
 
    6.2.1         -Added Extra Field placeholder for       04/01/2005
-                  POSZIP using ID 0x4690
+                  POSZIP using ID 064690
 
                  -Clarified size field on 
                   "zip64 end of central directory record"
