@@ -648,7 +648,7 @@ Copyright (c) 1989 - 2014, 2018, 2019, 2020, 2022 PKWARE Inc., All Rights Reserv
 
 4.4  Explanation of fields
 --------------------------
-      
+
    4.4.1 General notes on fields
 
       4.4.1.1  All fields unless otherwise noted are unsigned and stored
