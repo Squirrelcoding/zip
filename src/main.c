@@ -65,12 +65,12 @@ char *read_string(uint8_t *source, size_t offset, size_t length)
 	return ptr;
 }
 
-size_t read_bits(uint8_t *destination, uint8_t *source, size_t start, size_t size)
+size_t read_bits(uint8_t *source, size_t start, size_t size)
 {
   size_t output = 0;
 
   for (size_t i = 0; i < size; i++)
-    output |= source[start + i] << i * 8;
+    output |= source[start + i] << 8 * i;
 
   return output;
 }
@@ -152,28 +152,15 @@ int main(void)
 			eocd_buffer = malloc(sizeof(char) * remaining_bytes);
 			memcpy(eocd_buffer, buffer + offset + 4, sizeof(char) * remaining_bytes);
 
-			// First 2 bytes
-			eocd.number_of_this_disk = eocd_buffer[0] | eocd_buffer[1] << 8;
-
-			eocd.number_of_disk_with_start_of_central_directory = eocd_buffer[2] | eocd_buffer[3] << 8;
-
-			eocd.number_of_entries_in_central_directory_on_disk = eocd_buffer[4] | eocd_buffer[5] << 8;
-
-			eocd.total_entries_in_central_directory = eocd_buffer[6] | eocd_buffer[7] << 8;
-
-			eocd.size_of_central_directory = (eocd_buffer[11] << 24) |
-											 (eocd_buffer[10] << 16) |
-											 (eocd_buffer[9] << 8) |
-											 (eocd_buffer[8]);
-
-			eocd.size_of_central_directory_offset = (eocd_buffer[15] << 24) |
-													(eocd_buffer[14] << 16) |
-													(eocd_buffer[13] << 8) |
-													(eocd_buffer[12]);
-
-			eocd.zip_file_comment_length = eocd_buffer[16] | eocd_buffer[17] << 8;
-
+			eocd.number_of_this_disk = read_bits(eocd_buffer, 0, 2);
+			eocd.number_of_disk_with_start_of_central_directory = read_bits(eocd_buffer, 2, 2);
+			eocd.number_of_entries_in_central_directory_on_disk = read_bits(eocd_buffer, 4, 2);
+			eocd.total_entries_in_central_directory = read_bits(eocd_buffer, 6, 2);
+			eocd.size_of_central_directory = read_bits(eocd_buffer, 8, 4);
+			eocd.size_of_central_directory_offset = read_bits(eocd_buffer, 12, 4);
+			eocd.zip_file_comment_length = read_bits(eocd_buffer, 16, 2);
 			eocd.zip_file_comment = read_string(eocd_buffer, 18, eocd.zip_file_comment_length);
+
 			break;
 		}
 	}
@@ -190,49 +177,25 @@ int main(void)
 		// Index for where the data actually starts; we add 4 to skip the magic number.
 		size_t idx = start_of_header + 4;
 
-		temp_cd_file_header.version_made_by = buffer[idx] | buffer[idx + 1] << 8;
-		temp_cd_file_header.version_needed_to_extract = buffer[idx + 2] | buffer[idx + 3] << 8;
-		temp_cd_file_header.general_purpose_bit_flag = buffer[idx + 4] | buffer[idx + 5] << 8;
-		temp_cd_file_header.compression_method = buffer[idx + 6] | buffer[idx + 7] << 8;
-		temp_cd_file_header.last_mod_file_time = buffer[idx + 8] | buffer[idx + 9] << 8;
-		temp_cd_file_header.last_mod_file_date = buffer[idx + 10] | buffer[idx + 11] << 8;
+		temp_cd_file_header.version_made_by = read_bits(buffer, idx, 2);
+		temp_cd_file_header.version_needed_to_extract = read_bits(buffer, idx + 2, 2);
+		temp_cd_file_header.general_purpose_bit_flag = read_bits(buffer, idx + 4, 2);
+		temp_cd_file_header.compression_method = read_bits(buffer, idx + 6, 2);
+		temp_cd_file_header.last_mod_file_time = read_bits(buffer, idx + 8, 2);
+		temp_cd_file_header.last_mod_file_date = read_bits(buffer, idx + 10, 2);
+		temp_cd_file_header.crc_32 = read_bits(buffer, idx + 12, 4);
+		temp_cd_file_header.compressed_size = read_bits(buffer, idx + 16, 4);
+		temp_cd_file_header.uncompressed_size = read_bits(buffer, idx + 20, 4);
+		temp_cd_file_header.file_name_length = read_bits(buffer, idx + 24, 2);
+		temp_cd_file_header.extra_field_length = read_bits(buffer, idx + 26, 2);
+		temp_cd_file_header.file_comment_length = read_bits(buffer, idx + 28, 2);
+		temp_cd_file_header.disk_number_start = read_bits(buffer, idx + 30, 2);
+		temp_cd_file_header.internal_file_attributes = read_bits(buffer, idx + 32, 2);
+		temp_cd_file_header.external_file_attributes = read_bits(buffer, idx + 34, 4);
+		temp_cd_file_header.relative_offset_of_local_header = read_bits(buffer, idx + 38, 4);
 
-		temp_cd_file_header.crc_32 = buffer[idx + 12] |
-									 buffer[idx + 13] << 8 |
-									 buffer[idx + 14] << 16 |
-									 buffer[idx + 15] << 24;
-
-		temp_cd_file_header.compressed_size = buffer[idx + 16] |
-											  buffer[idx + 17] << 8 |
-											  buffer[idx + 18] << 16 |
-											  buffer[idx + 19] << 24;
-
-		temp_cd_file_header.uncompressed_size = buffer[idx + 20] |
-												buffer[idx + 21] << 8 |
-												buffer[idx + 22] << 16 |
-												buffer[idx + 23] << 24;
-
-		temp_cd_file_header.file_name_length = buffer[idx + 24] | buffer[idx + 25] << 8;
-		temp_cd_file_header.extra_field_length = buffer[idx + 26] | buffer[idx + 27] << 8;
-		temp_cd_file_header.file_comment_length = buffer[idx + 28] | buffer[idx + 29] << 8;
-		temp_cd_file_header.disk_number_start = buffer[idx + 30] | buffer[idx + 31] << 8;
-		temp_cd_file_header.internal_file_attributes = buffer[idx + 32] | buffer[idx + 33] << 8;
-
-		temp_cd_file_header.external_file_attributes = buffer[idx + 34] |
-													   buffer[idx + 35] << 8 |
-													   buffer[idx + 36] << 16 |
-													   buffer[idx + 37] << 24;
-
-		temp_cd_file_header.relative_offset_of_local_header = buffer[idx + 38] |
-															  buffer[idx + 39] << 8 |
-															  buffer[idx + 40] << 16 |
-															  buffer[idx + 41] << 24;
-
-		// Read file name
 		temp_cd_file_header.file_name = read_string(buffer, idx + 42, temp_cd_file_header.file_name_length);
-		// Read extra field
 		temp_cd_file_header.extra_field = read_string(buffer, idx + 42 + temp_cd_file_header.file_name_length, temp_cd_file_header.extra_field_length);
-		// Read file comment
 		temp_cd_file_header.file_comment = read_string(
 			buffer, idx + 42 + temp_cd_file_header.file_name_length + temp_cd_file_header.extra_field_length,
 			temp_cd_file_header.file_comment_length);
@@ -247,6 +210,8 @@ int main(void)
 	// Loops through all the files to unzip them
 	for (size_t i = 0; i < eocd.number_of_entries_in_central_directory_on_disk; i++) {
 		printf("Compression method: %u\n", cd_file_headers[i].compression_method);
+
+		printf("%s\n", cd_file_headers[i].file_name);
 
 		// Start of the file header, skipping the header.
 		size_t p = buffer[cd_file_headers[i].relative_offset_of_local_header] + 4;
