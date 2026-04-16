@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <errno.h>
@@ -16,9 +17,9 @@ typedef struct
 	uint32_t uncompressed_size;
 	uint16_t file_name_length;
 	uint16_t extra_field_length;
-	size_t file_name;
-	size_t extra_field;
-} zip_header;
+	char *file_name;
+	char *extra_field;
+} local_file_header;
 
 typedef struct
 {
@@ -55,7 +56,7 @@ typedef struct
 	char *zip_file_comment;
 } eocd_record;
 
-char *read_string_u8(uint8_t *source, size_t offset, size_t length)
+char *read_string(uint8_t *source, size_t offset, size_t length)
 {
 	char *ptr = malloc(sizeof(char) * length);
 
@@ -64,23 +65,24 @@ char *read_string_u8(uint8_t *source, size_t offset, size_t length)
 	return ptr;
 }
 
-char *read_string_char(char *source, size_t offset, size_t length)
+size_t read_bits(uint8_t *destination, uint8_t *source, size_t start, size_t size)
 {
-	char *ptr = malloc(sizeof(char) * length);
+  size_t output = 0;
 
-	memcpy(ptr, source + offset, sizeof(char) * length);
+  for (size_t i = 0; i < size; i++)
+    output |= source[start + i] << i * 8;
 
-	return ptr;
+  return output;
 }
 
 int main(void)
 {
-	char *buffer = NULL;
+	uint8_t *buffer = NULL;
 	FILE *fp;
 	unsigned char c;
 	size_t file_size;
 
-	fp = fopen("out.zip", "rb");
+	fp = fopen("example.zip", "rb");
 
 	// If the file doesn't exist
 	if (fp == NULL)
@@ -131,7 +133,6 @@ int main(void)
 
 	eocd_record eocd;
 	uint8_t *eocd_buffer;
-	char *eocd_zip_file_comment_buffer;
 
 	// Find EOCD signature
 	for (size_t offset = file_size - sizeof(char) * 4; offset > 0; offset--)
@@ -172,7 +173,7 @@ int main(void)
 
 			eocd.zip_file_comment_length = eocd_buffer[16] | eocd_buffer[17] << 8;
 
-			eocd.zip_file_comment = read_string_u8(eocd_buffer, 18, eocd.zip_file_comment_length);
+			eocd.zip_file_comment = read_string(eocd_buffer, 18, eocd.zip_file_comment_length);
 			break;
 		}
 	}
@@ -228,11 +229,11 @@ int main(void)
 															  buffer[idx + 41] << 24;
 
 		// Read file name
-		temp_cd_file_header.file_name = read_string_char(buffer, idx + 42, temp_cd_file_header.file_name_length);
+		temp_cd_file_header.file_name = read_string(buffer, idx + 42, temp_cd_file_header.file_name_length);
 		// Read extra field
-		temp_cd_file_header.extra_field = read_string_char(buffer, idx + 42 + temp_cd_file_header.file_name_length, temp_cd_file_header.extra_field_length);
+		temp_cd_file_header.extra_field = read_string(buffer, idx + 42 + temp_cd_file_header.file_name_length, temp_cd_file_header.extra_field_length);
 		// Read file comment
-		temp_cd_file_header.file_comment = read_string_char(
+		temp_cd_file_header.file_comment = read_string(
 			buffer, idx + 42 + temp_cd_file_header.file_name_length + temp_cd_file_header.extra_field_length,
 			temp_cd_file_header.file_comment_length);
 
@@ -243,7 +244,15 @@ int main(void)
 		cd_file_headers[i] = temp_cd_file_header;
 	}
 
-	
+	// Loops through all the files to unzip them
+	for (size_t i = 0; i < eocd.number_of_entries_in_central_directory_on_disk; i++) {
+		printf("Compression method: %u\n", cd_file_headers[i].compression_method);
+
+		// Start of the file header, skipping the header.
+		size_t p = buffer[cd_file_headers[i].relative_offset_of_local_header] + 4;
+
+		printf("\n");
+	}
 
 	free(temp_cd_file_header.file_name);
 	free(temp_cd_file_header.extra_field);
