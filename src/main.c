@@ -82,7 +82,7 @@ int main(void)
 	unsigned char c;
 	size_t file_size;
 
-	fp = fopen("example.zip", "rb");
+	fp = fopen("out.zip", "rb");
 
 	// If the file doesn't exist
 	if (fp == NULL)
@@ -209,14 +209,48 @@ int main(void)
 
 	// Loops through all the files to unzip them
 	for (size_t i = 0; i < eocd.number_of_entries_in_central_directory_on_disk; i++) {
+
+		local_file_header temp_header;
+
 		printf("Compression method: %u\n", cd_file_headers[i].compression_method);
 
 		printf("%s\n", cd_file_headers[i].file_name);
 
 		// Start of the file header, skipping the header.
-		size_t p = buffer[cd_file_headers[i].relative_offset_of_local_header] + 4;
+		size_t p = cd_file_headers[i].relative_offset_of_local_header + 4;
 
-		printf("\n");
+		temp_header.version_needed_to_extract = read_bits(buffer, p, 2);
+		temp_header.general_purpose_bit_flag = read_bits(buffer, p + 2, 2);
+		temp_header.compression_method = read_bits(buffer, p + 4, 2);
+		temp_header.last_mod_file_time = read_bits(buffer, p + 6, 2);
+		temp_header.last_mod_file_date = read_bits(buffer, p + 8, 2);
+		temp_header.crc_32 = read_bits(buffer, p + 10, 4);
+		temp_header.compressed_size = read_bits(buffer, p + 14, 4);
+		temp_header.uncompressed_size = read_bits(buffer, p + 18, 4);
+		temp_header.file_name_length = read_bits(buffer, p + 22, 2);
+		temp_header.extra_field_length = read_bits(buffer, p + 24, 2);
+		temp_header.file_name = read_string(buffer, p + 26, temp_header.file_name_length);
+		temp_header.extra_field = read_string(buffer, p + 26 + temp_header.file_name_length, temp_header.extra_field_length);
+
+		printf("Ccompressed size: %u\n", temp_header.compressed_size);
+		printf("Uncompressed size: %u\n", temp_header.uncompressed_size);
+		printf("File name length: %s\n", temp_header.file_name);
+
+		char *compressed_data = malloc(sizeof(char) * temp_header.compressed_size);
+
+		p += 26 + temp_header.file_name_length + temp_header.extra_field_length;
+		memcpy(compressed_data, buffer + p, sizeof(char) * temp_header.compressed_size);
+
+		// Write the file data to a file
+		FILE *output;
+		fp = fopen(temp_header.file_name, "wb");
+
+		fwrite(compressed_data, sizeof(char), temp_header.compressed_size, fp);
+
+		fclose(fp);
+		free(temp_header.file_name);
+		free(temp_header.extra_field);
+		free(compressed_data);
 	}
 
 	free(temp_cd_file_header.file_name);
