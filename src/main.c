@@ -1,8 +1,8 @@
-#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <stddef.h>
 #include <string.h>
 
 typedef struct
@@ -82,7 +82,7 @@ int main(void)
 	unsigned char c;
 	size_t file_size;
 
-	fp = fopen("out.zip", "rb");
+	fp = fopen("example.zip", "rb");
 
 	// If the file doesn't exist
 	if (fp == NULL)
@@ -234,7 +234,9 @@ int main(void)
 
 		printf("Ccompressed size: %u\n", temp_header.compressed_size);
 		printf("Uncompressed size: %u\n", temp_header.uncompressed_size);
+		printf("Compression method: %u\n", temp_header.compression_method);
 		printf("File name length: %s\n", temp_header.file_name);
+		printf("\n\n");
 
 		char *compressed_data = malloc(sizeof(char) * temp_header.compressed_size);
 
